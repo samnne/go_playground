@@ -1,0 +1,298 @@
+:root {
+  --ink: #14283a;
+  --muted: #566878;
+  --line: #d3dce3;
+  --surface: rgba(250, 252, 253, 0.94);
+  --accent: #1b5e8c;
+
+  --roomy: #2a9d8f;
+  --some: #e9a820;
+  --busy: #c8402a;
+  --unknown: #8593a0;
+
+  font-family: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  background: #e8eef2;
+}
+
+/* Panel */
+
+.panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  width: 296px;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  padding: 18px;
+  background: var(--surface);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(20, 40, 58, 0.14);
+  display: grid;
+  gap: 18px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.summary {
+  margin: 4px 0 0;
+  font-size: 0.9375rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.status {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--busy);
+}
+
+.status:empty {
+  display: none;
+}
+
+/* Legend */
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-size: 0.875rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(20, 40, 58, 0.25);
+  background: var(--tone);
+}
+
+.roomy { --tone: var(--roomy); }
+.some { --tone: var(--some); }
+.busy { --tone: var(--busy); }
+.unknown { --tone: var(--unknown); }
+
+/* Route chips */
+
+.routes-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.routes-head h2 {
+  margin-bottom: 8px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  min-width: 40px;
+  padding: 5px 10px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip:hover {
+  border-color: var(--ink);
+}
+
+.chip[aria-pressed="true"] {
+  color: #fff;
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.link {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Bus markers */
+
+.bus-icon {
+  background: none;
+  border: 0;
+}
+
+.bus {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+.bus .arrow,
+.bus .dot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  filter: drop-shadow(0 1px 2px rgba(20, 40, 58, 0.4));
+}
+
+.bus .arrow {
+  width: 26px;
+  height: 26px;
+  fill: var(--tone);
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  transform: rotate(var(--bearing, 0deg));
+  display: none;
+}
+
+.bus .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tone);
+  border: 2.5px solid #fff;
+}
+
+.bus.moving .arrow {
+  display: block;
+}
+
+.bus.moving .dot {
+  display: none;
+}
+
+.leaflet-marker-icon:focus-visible .bus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+
+/* Popup */
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+.leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.4;
+}
+
+.popup .route {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.popup p {
+  margin: 2px 0;
+  font-size: 0.875rem;
+}
+
+.popup .small {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.popup .tone {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+/* Small screens: panel becomes a bottom sheet */
+
+@media (max-width: 640px) {
+  .panel {
+    top: auto;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    width: auto;
+    max-height: 44%;
+    padding: 14px;
+    gap: 14px;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+  }
+}

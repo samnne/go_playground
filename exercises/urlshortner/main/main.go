@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-
 	pathToUrls := map[string]string{
 		"/yt": "https://www.youtube.com",
 		"/se": "https://samechefu.com",
@@ -20,10 +19,8 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(pathToUrls)
-
 	})
 	http.HandleFunc("/", urlshortner.MapHandler(pathToUrls, fallback))
 	fmt.Println("Starting the server on 8080")
 	http.ListenAndServe(":8080", nil)
-
 }

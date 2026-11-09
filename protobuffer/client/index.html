@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Victoria buses</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="map" aria-label="Map of live bus positions in Greater Victoria"></div>
+
+    <aside class="panel" aria-label="Bus map controls">
+      <header>
+        <h1>Victoria buses</h1>
+        <p id="summary" class="summary">Loading buses</p>
+      </header>
+
+      <section aria-labelledby="legend-title">
+        <h2 id="legend-title">Seat availability</h2>
+        <ul class="legend">
+          <li><span class="swatch roomy"></span>Seats free</li>
+          <li><span class="swatch some"></span>Few seats</li>
+          <li><span class="swatch busy"></span>Standing or full</li>
+          <li><span class="swatch unknown"></span>No data</li>
+        </ul>
+        <p class="hint">Arrows point the way a bus is heading. Circles are buses at a stop.</p>
+      </section>
+
+      <section aria-labelledby="routes-title">
+        <div class="routes-head">
+          <h2 id="routes-title">Routes</h2>
+          <button id="clear" class="link" type="button" hidden>Show all routes</button>
+        </div>
+        <div id="routes" class="chips"></div>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+    </aside>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="./main.js" type="module"></script>
+  </body>
+</html>
