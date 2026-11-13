@@ -29,7 +29,7 @@ const ARROW_SVG =
 const map = L.map("map", { zoomControl: false }).setView([48.4284, -123.3656], 12);
 L.control.zoom({ position: window.innerWidth <= 640 ? "topright" : "bottomright" }).addTo(map);
 
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_5528_1_41c6030ab831eebf5b285ad8", {
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_5528_2_e804df182fe3bff79602e3e0", {
   maxZoom: 19,
   subdomains: "abcd",
   attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
