@@ -76,6 +76,7 @@ async function load() {
     const res = await fetch(API_URL);
     if (!res.ok) throw new Error(`Server replied ${res.status}`);
     const feed = await res.json();
+    console.log(feed)
 
     const list = (feed.entity ?? []).map(normalize).filter(Boolean);
     lastFeedTime = feed.header?.timestamp ? new Date(Number(feed.header.timestamp) * 1000) : new Date();
