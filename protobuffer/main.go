@@ -6,25 +6,26 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"protobuffer/middleware"
+	"protobuffer/repository"
 	"time"
 
 	pb "protobuffer/pb"
-	"protobuffer/trips"
 
+	"github.com/gorilla/mux"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
-type TripRequest struct {
-	date      string
-	TripsData *[]trips.Trip
-}
-
-var cache map[string]TripRequest = make(map[string]TripRequest)
-
 const feedURL = "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=48"
 
 var client = &http.Client{Timeout: 10 * time.Second}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
 
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, feedURL, nil)
@@ -82,35 +83,15 @@ func tripsHandler(w http.ResponseWriter, r *http.Request) {
 	routeID := query.Get("routeID")
 	date := query.Get("date")
 	fmt.Printf("date: %v\n", date)
+
 	fmt.Printf("routeID: %v\n", routeID)
 	if !query.Has("date") || !query.Has("routeID") {
 
-		jsonData, err := json.Marshal("")
-		if err != nil {
-			return
-		}
-
-		w.Write(jsonData)
+		w.Write([]byte("Must include a routeID and date in url"))
 		return
 	}
 
-	if tr, exists := cache[routeID]; exists && tr.date == date {
-
-		jsonData, err := json.Marshal(tr.TripsData)
-		if err != nil {
-			log.Printf("encoding json: %v", err)
-			http.Error(w, "failed to encode feed", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(jsonData)
-		if err != nil {
-			return
-		}
-		return
-	}
-
-	tripArray := trips.BuildTrips(routeID, date)
+	tripArray := repository.GetTrips(routeID, date)
 
 	jsonData, err := json.Marshal(tripArray)
 	if err != nil {
@@ -118,10 +99,8 @@ func tripsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode feed", http.StatusInternalServerError)
 		return
 	}
-	cache[routeID] = TripRequest{
-		date:      date,
-		TripsData: &tripArray,
-	}
+	repository.AddToCache(routeID, date, tripArray)
+
 	w.Header().Set("Content-Type", "application/json")
 	idx, err := w.Write(jsonData)
 	fmt.Printf("idx: %v\n", idx)
@@ -131,11 +110,30 @@ func tripsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/fetch", fetchHandler)
-	mux.HandleFunc("/trips", tripsHandler)
-	mux.Handle("/", http.FileServer(http.Dir("./client")))
+
+	router := mux.NewRouter()
+
+	router.Use(middleware.LoggingMiddleware)
+	router.Use(middleware.RebuildData)
+
+	router.HandleFunc("/health", healthHandler)
+	router.HandleFunc("/fetch", fetchHandler)
+	router.HandleFunc("/trips", tripsHandler)
+	router.HandleFunc("/trips/{id}", func(w http.ResponseWriter, r *http.Request) {
+		vals := mux.Vars(r)
+		fmt.Printf("id: %v\n", vals["id"])
+		trip := repository.GetTripByID(vals["id"], "4-UVIC", "")
+		jsonData, err := json.Marshal(trip)
+		if err != nil {
+			log.Printf("encoding json: %v", err)
+			http.Error(w, "failed to encode feed", http.StatusInternalServerError)
+			return
+		}
+
+		w.Write(jsonData)
+	})
+	router.Handle("/", http.FileServer(http.Dir("./client")))
 	fmt.Println("Serving html on http://localhost:8080/")
 
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Fatal(http.ListenAndServe(":8080", router))
 }

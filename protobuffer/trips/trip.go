@@ -1,12 +1,17 @@
 package trips
 
 import (
+	"archive/zip"
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // Trip represents a GTFS trip from trips.txt.
@@ -28,6 +33,94 @@ type Stop struct {
 	StopName     string
 	ArrivalTime  string
 	StopSequence int
+}
+
+func ZipFiles() {
+	url := "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=48"
+	dest := "data.zip"
+	extractDir := "data"
+
+	// 1. Send the HTTP GET request
+	resp, err := http.Get(url)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	// 2. Verify the server returned HTTP 200 OK
+	if resp.StatusCode != http.StatusOK {
+		panic(fmt.Sprintf("bad status: %s", resp.Status))
+	}
+
+	// 3. Create the local destination file
+	out, err := os.Create(dest)
+	if err != nil {
+		panic(err)
+	}
+	defer out.Close()
+
+	// 4. Stream the response body directly to the file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	if err := unzip(dest, extractDir); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("ZIP file downloaded and extracted successfully.")
+}
+
+func unzip(src, dest string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		return err
+	}
+
+	dest = filepath.Clean(dest) + string(os.PathSeparator)
+
+	for _, f := range r.File {
+		fpath := filepath.Join(dest, f.Name)
+		if !strings.HasPrefix(fpath, dest) {
+			return fmt.Errorf("illegal file path: %s", fpath)
+		}
+
+		if f.FileInfo().IsDir() {
+			if err := os.MkdirAll(fpath, f.Mode()); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := os.MkdirAll(filepath.Dir(fpath), 0o755); err != nil {
+			return err
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			return err
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			outFile.Close()
+			return err
+		}
+
+		_, err = io.Copy(outFile, rc)
+		outFile.Close()
+		rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func openCSVReader(file io.Reader, err error) (map[string]int, *csv.Reader) {
@@ -70,9 +163,10 @@ func GetActiveServiceIDs(date string) map[string]struct{} {
 	return active
 }
 
-// BuildStops reads stop_times.txt for tripID and joins stop names from stops.txt.
-func attachStops(trips []Trip, wanted map[string]int) {
-	if len(wanted) == 0 {
+// attachStops reads stop_times.txt and attaches stops to the provided trips map,
+// joining stop names from stops.txt.
+func attachStops(trips map[string]*Trip) {
+	if len(trips) == 0 {
 		return
 	}
 	stopNames := loadStopNames() // once
@@ -95,7 +189,7 @@ func attachStops(trips []Trip, wanted map[string]int) {
 			log.Fatal(err)
 		}
 
-		i, ok := wanted[record[tripCol]]
+		trip, ok := trips[record[tripCol]]
 		if !ok {
 			continue
 		}
@@ -108,7 +202,7 @@ func attachStops(trips []Trip, wanted map[string]int) {
 		}
 
 		stopID := record[stopCol]
-		trips[i].Stops = append(trips[i].Stops, Stop{
+		trip.Stops = append(trip.Stops, Stop{
 			StopID:       stopID,
 			StopName:     stopNames[stopID],
 			ArrivalTime:  record[arrCol],
@@ -116,8 +210,8 @@ func attachStops(trips []Trip, wanted map[string]int) {
 		})
 	}
 
-	for i := range trips {
-		s := trips[i].Stops
+	for _, trip := range trips {
+		s := trip.Stops
 		sort.Slice(s, func(a, b int) bool { return s[a].StopSequence < s[b].StopSequence })
 	}
 }
@@ -144,7 +238,7 @@ func loadStopNames() map[string]string {
 // BuildTrips reads trips.txt and returns trips for routeID that are active on date.
 // If date is empty, all trips for routeID are returned.
 // main entry point
-func BuildTrips(routeID, date string) []Trip {
+func BuildTrips(routeID, date string) map[string]*Trip {
 	file, err := os.Open("data/trips.txt")
 	idx, reader := openCSVReader(file, err)
 	defer file.Close()
@@ -154,8 +248,7 @@ func BuildTrips(routeID, date string) []Trip {
 		active = GetActiveServiceIDs(date)
 	}
 
-	var tripsOut []Trip
-	wanted := make(map[string]int) // tripID -> index in tripsOut
+	tripsOut := make(map[string]*Trip)
 
 	for {
 		record, err := reader.Read()
@@ -184,8 +277,7 @@ func BuildTrips(routeID, date string) []Trip {
 		}
 
 		tripID := record[idx["trip_id"]]
-		wanted[tripID] = len(tripsOut)
-		tripsOut = append(tripsOut, Trip{
+		tripsOut[tripID] = &Trip{
 			RouteID:      record[idx["route_id"]],
 			ServiceID:    serviceID,
 			TripID:       tripID,
@@ -193,10 +285,10 @@ func BuildTrips(routeID, date string) []Trip {
 			ShapeID:      record[idx["shape_id"]],
 			BlockID:      record[idx["block_id"]],
 			DirectionID:  dir,
-		})
+		}
 	}
 
-	attachStops(tripsOut, wanted)
+	attachStops(tripsOut)
 	return tripsOut
 }
 
