@@ -57,4 +57,7 @@ func TestBuildTrips(t *testing.T) {
 	if first.StopID == "" || first.ArrivalTime == "" {
 		t.Fatalf("expected first stop to have id and arrival time, got %+v", first)
 	}
+	if first.StopLat == 0 || first.StopLong == 0 {
+		t.Fatalf("expected first stop to have non-zero stop_lat and stop_long, got lat=%f long=%f", first.StopLat, first.StopLong)
+	}
 }

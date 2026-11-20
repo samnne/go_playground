@@ -6,9 +6,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
+
 	"protobuffer/middleware"
 	"protobuffer/repository"
-	"time"
 
 	pb "protobuffer/pb"
 
@@ -25,6 +26,47 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
+}
+
+func attachRouteNames(data []byte) ([]byte, error) {
+	var feed map[string]any
+	if err := json.Unmarshal(data, &feed); err != nil {
+		return nil, err
+	}
+
+	entities, ok := feed["entity"].([]any)
+	if !ok {
+		return json.Marshal(feed)
+	}
+
+	for _, e := range entities {
+		ent, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		vehicle, ok := ent["vehicle"].(map[string]any)
+		if !ok {
+			continue
+		}
+		trip, ok := vehicle["trip"].(map[string]any)
+		if !ok {
+			continue
+		}
+		routeID, _ := trip["routeId"].(string)
+		if routeID == "" {
+			continue
+		}
+		if route := repository.GetRoute(routeID); route != nil {
+			vehicle["routeName"] = route.RouteName
+			vehicle["route"] = route
+		}
+		tid := trip["tripId"].(string)
+		if sendtrip := repository.GetTripByID(tid, routeID, ""); sendtrip != nil {
+			vehicle["trip"] = sendtrip
+		}
+	}
+
+	return json.Marshal(feed)
 }
 
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +112,14 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jsonData, err = attachRouteNames(jsonData)
+
+	if err != nil {
+		log.Printf("attaching route names: %v", err)
+		http.Error(w, "failed to encode feed", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	idx, err := w.Write(jsonData)
 	fmt.Printf("idx: %v\n", idx)
@@ -109,7 +159,32 @@ func tripsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func allBusesHandler(w http.ResponseWriter, r *http.Request) {
+	tripArray := repository.GetTrips("", "")
+
+	jsonData, err := json.Marshal(tripArray)
+	if err != nil {
+		log.Printf("encoding json: %v", err)
+		http.Error(w, "failed to encode feed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	idx, err := w.Write(jsonData)
+	fmt.Printf("idx: %v\n", idx)
+	if err != nil {
+		return
+	}
+}
+
 func main() {
+	log.Println("Indexing GTFS dataset into memory...")
+	if err := repository.LoadGTFS("data.zip"); err != nil {
+		if err := repository.LoadGTFS("data"); err != nil {
+			log.Fatalf("Failed to initialize GTFS cache: %v", err)
+		}
+	}
+	log.Println("GTFS loaded.")
 
 	router := mux.NewRouter()
 
@@ -119,6 +194,7 @@ func main() {
 	router.HandleFunc("/health", healthHandler)
 	router.HandleFunc("/fetch", fetchHandler)
 	router.HandleFunc("/trips", tripsHandler)
+	router.HandleFunc("/trips/all", allBusesHandler)
 	router.HandleFunc("/trips/{id}", func(w http.ResponseWriter, r *http.Request) {
 		vals := mux.Vars(r)
 		fmt.Printf("id: %v\n", vals["id"])
@@ -132,7 +208,7 @@ func main() {
 
 		w.Write(jsonData)
 	})
-	router.Handle("/", http.FileServer(http.Dir("./client")))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./client")))
 	fmt.Println("Serving html on http://localhost:8080/")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
